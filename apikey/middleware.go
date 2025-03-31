@@ -15,7 +15,7 @@ type Options struct {
 	AllowedHTTPMethodsOverride []string
 }
 
-func NewOptions(secretProvider SecretProvider) Options {
+func NewOptions() Options {
 	return Options{
 		SecretProvider: &EnvironmentSecretProvider{
 			CurrentSecretHeaderName:            "CHI_API_KEY",
@@ -23,6 +23,7 @@ func NewOptions(secretProvider SecretProvider) Options {
 			ReadonlySecretHeaderName:           "CHI_API_KEY_READONLY",
 			DeprecatedReadonlySecretHeaderName: "CHI_API_KEY_READONLY_DEPRECATED",
 		},
+		HeaderAuthProvider: AuthorizationHeader{},
 	}
 }
 
