@@ -55,7 +55,7 @@ type XApiKeyHeader struct {
 
 var _ HeaderAuthProvider = (*XApiKeyHeader)(nil)
 
-const HeaderNameXApiKey = "X-Api-Key"
+const HeaderNameXApiKey = "X-Api-Key" // #nosec G101
 
 func (h XApiKeyHeader) Name() string {
 	return HeaderNameXApiKey

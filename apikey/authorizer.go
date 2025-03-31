@@ -18,9 +18,12 @@ func (a Authorizer) AvailableHTTPMethods() []string {
 		return a.AllowedHTTPMethodsOverride
 	}
 	if a.ReadOnly {
-		return readonlyHTTPMethods
+		return []string{http.MethodHead, http.MethodGet}
 	}
-	return allHTTPMethods
+	return []string{
+		http.MethodHead, http.MethodPost, http.MethodPut,
+		http.MethodPatch, http.MethodDelete, http.MethodGet,
+	}
 }
 
 func (a Authorizer) AvailableAPIKeys() []string {

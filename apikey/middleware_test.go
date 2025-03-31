@@ -13,16 +13,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const apiKeyHeaderName = "X_API_KEY"
+
 func TestAPITokenAuth_Allow(t *testing.T) {
 	router := chi.NewRouter()
-	headerName := "X_API_KEY"
-	t.Setenv(headerName, "test-x-api-key-123")
 
+	t.Setenv(apiKeyHeaderName, "test-x-api-key-123")
 	router.Use(
 		Authorize(Options{
 			HeaderAuthProvider: AuthorizationHeader{},
 			SecretProvider: &EnvironmentSecretProvider{
-				CurrentSecretHeaderName: headerName,
+				CurrentSecretHeaderName: apiKeyHeaderName,
 			},
 		}))
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
@@ -39,6 +40,7 @@ func TestAPITokenAuth_Allow(t *testing.T) {
 
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
+	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	data, err := io.ReadAll(resp.Body)
@@ -51,14 +53,13 @@ func TestAPITokenAuth_Allow(t *testing.T) {
 
 func TestAPITokenAuth_Deny(t *testing.T) {
 	router := chi.NewRouter()
-	headerName := "X_API_KEY"
-	t.Setenv(headerName, "test-x-api-key-567")
+	t.Setenv(apiKeyHeaderName, "test-x-api-key-567")
 
 	router.Use(
 		Authorize(Options{
 			HeaderAuthProvider: AuthorizationHeader{},
 			SecretProvider: &EnvironmentSecretProvider{
-				CurrentSecretHeaderName: headerName,
+				CurrentSecretHeaderName: apiKeyHeaderName,
 			},
 		}))
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
@@ -76,6 +77,8 @@ func TestAPITokenAuth_Deny(t *testing.T) {
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 
+	defer resp.Body.Close()
+
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	data, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
@@ -85,16 +88,15 @@ func TestAPITokenAuth_Deny(t *testing.T) {
 
 func TestAPITokenAuth_Deny_Readonly_MethodNotSupported(t *testing.T) {
 	router := chi.NewRouter()
-	headerName := "X_API_KEY"
-	secret := "test-x-api-key-567"
-	t.Setenv(headerName, secret)
+	secret := "test-x-api-key-567" // #nosec G101
+	t.Setenv(apiKeyHeaderName, secret)
 
 	router.Use(
 		Authorize(Options{
 			ReadOnly:           true,
 			HeaderAuthProvider: AuthorizationHeader{},
 			SecretProvider: &EnvironmentSecretProvider{
-				ReadonlySecretHeaderName: headerName,
+				ReadonlySecretHeaderName: apiKeyHeaderName,
 			},
 		}))
 	router.Post("/", func(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +113,8 @@ func TestAPITokenAuth_Deny_Readonly_MethodNotSupported(t *testing.T) {
 
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
+
+	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	data, err := io.ReadAll(resp.Body)

@@ -27,11 +27,6 @@ func NewOptions() Options {
 	}
 }
 
-var readonlyHTTPMethods = []string{http.MethodHead, http.MethodGet}
-var allHTTPMethods = []string{
-	http.MethodHead, http.MethodPost, http.MethodPut,
-	http.MethodPatch, http.MethodDelete, http.MethodGet}
-
 // Authorize implements a simple middleware handler for creating header-based authentication schemes.
 func Authorize(options Options) func(next http.Handler) http.Handler {
 	if options.FailureHandler == nil {
