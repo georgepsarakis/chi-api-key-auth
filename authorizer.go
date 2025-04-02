@@ -26,12 +26,27 @@ func (a Authorizer) AvailableHTTPMethods() []string {
 	}
 }
 
-func (a Authorizer) AvailableAPIKeys() []string {
+func (a Authorizer) IsValidRequest(r *http.Request, requestKey string) bool {
+	if requestKey == "" {
+		return false
+	}
+	for _, apiKey := range a.availableAPIKeys(r.Method) {
+		if apiKey == "" {
+			return false
+		}
+		if subtle.ConstantTimeCompare([]byte(apiKey), []byte(requestKey)) == 1 {
+			return true
+		}
+	}
+	return false
+}
+
+func (a Authorizer) availableAPIKeys(httpMethod string) []string {
 	var keys []string
 	if secret := a.SecretProvider.GetCurrentSecret(); secret != "" {
 		keys = append(keys, secret)
 	}
-	if a.ReadOnly {
+	if a.ReadOnly && slices.Contains(a.AvailableHTTPMethods(), httpMethod) {
 		if secret := a.SecretProvider.GetCurrentReadonlySecret(); secret != "" {
 			keys = append(keys, secret)
 		}
@@ -50,22 +65,4 @@ func (a Authorizer) AvailableAPIKeys() []string {
 		keys = append(keys, secret)
 	}
 	return keys
-}
-
-func (a Authorizer) IsValidRequest(r *http.Request, requestKey string) bool {
-	if !slices.Contains(a.AvailableHTTPMethods(), r.Method) {
-		return false
-	}
-	if requestKey == "" {
-		return false
-	}
-	for _, apiKey := range a.AvailableAPIKeys() {
-		if apiKey == "" {
-			return false
-		}
-		if subtle.ConstantTimeCompare([]byte(apiKey), []byte(requestKey)) == 1 {
-			return true
-		}
-	}
-	return false
 }
