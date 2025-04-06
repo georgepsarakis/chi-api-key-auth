@@ -15,19 +15,19 @@ type Options struct {
 	AllowedHTTPMethodsOverride []string
 }
 
-var defaultSecretProvider = func() *EnvironmentSecretProvider {
+func NewOptions() Options {
+	return Options{
+		SecretProvider:     defaultSecretProvider(),
+		HeaderAuthProvider: AuthorizationHeader{},
+	}
+}
+
+func defaultSecretProvider() *EnvironmentSecretProvider {
 	return &EnvironmentSecretProvider{
 		CurrentSecretHeaderName:            "CHI_API_KEY",
 		DeprecatedSecretHeaderName:         "CHI_API_KEY_DEPRECATED",
 		ReadonlySecretHeaderName:           "CHI_API_KEY_READONLY",
 		DeprecatedReadonlySecretHeaderName: "CHI_API_KEY_READONLY_DEPRECATED",
-	}
-}
-
-func NewOptions() Options {
-	return Options{
-		SecretProvider:     defaultSecretProvider(),
-		HeaderAuthProvider: AuthorizationHeader{},
 	}
 }
 

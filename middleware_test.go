@@ -14,6 +14,7 @@ import (
 )
 
 const apiKeyHeaderName = "X_API_KEY"
+const apiKeySecret = "test-x-api-key-567" // #nosec G101
 
 func TestAPITokenAuth_Allow(t *testing.T) {
 	router := chi.NewRouter()
@@ -53,7 +54,7 @@ func TestAPITokenAuth_Allow(t *testing.T) {
 
 func TestAPITokenAuth_Deny(t *testing.T) {
 	router := chi.NewRouter()
-	t.Setenv(apiKeyHeaderName, "test-x-api-key-567")
+	t.Setenv(apiKeyHeaderName, apiKeySecret)
 
 	router.Use(
 		Authorize(Options{
@@ -88,8 +89,7 @@ func TestAPITokenAuth_Deny(t *testing.T) {
 
 func TestAPITokenAuth_Deny_Readonly_MethodNotSupported(t *testing.T) {
 	router := chi.NewRouter()
-	secret := "test-x-api-key-567" // #nosec G101
-	t.Setenv(apiKeyHeaderName, secret)
+	t.Setenv(apiKeyHeaderName, apiKeySecret)
 
 	router.Use(
 		Authorize(Options{
@@ -109,7 +109,7 @@ func TestAPITokenAuth_Deny_Readonly_MethodNotSupported(t *testing.T) {
 	ctx := context.Background()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, srv.URL+"/", nil)
 	require.NoError(t, err)
-	req.Header.Set(HeaderNameAuthorization, fmt.Sprintf("Bearer %s", secret))
+	req.Header.Set(HeaderNameAuthorization, fmt.Sprintf("Bearer %s", apiKeySecret))
 
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
