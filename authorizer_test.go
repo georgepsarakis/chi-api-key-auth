@@ -76,18 +76,18 @@ func TestAuthorizer_AvailableAPIKeys(t *testing.T) {
 			a := Authorizer{
 				SecretProvider:              tt.fields.SecretProvider,
 				DeprecationExpirationPolicy: tt.fields.DeprecationExpirationPolicy,
-				ReadOnly:                    tt.fields.ReadOnly,
+				readOnly:                    tt.fields.ReadOnly,
 			}
 			assert.Equalf(t, tt.want, a.availableAPIKeys(tt.httpMethod), "availableAPIKeys()")
 		})
 	}
 }
 
-func TestAuthorizer_AvailableHTTPMethods(t *testing.T) {
+func TestAuthorizer_allowedHTTPMethods(t *testing.T) {
 	type fields struct {
 		SecretProvider              SecretProvider
 		DeprecationExpirationPolicy DeprecationExpirationPolicy
-		ReadOnly                    bool
+		Scope                       PermissionScope
 		AllowedHTTPMethodsOverride  []string
 	}
 	tests := []struct {
@@ -95,17 +95,42 @@ func TestAuthorizer_AvailableHTTPMethods(t *testing.T) {
 		fields fields
 		want   []string
 	}{
-		// TODO: Add test cases.
+		{
+			name: "read-write",
+			fields: fields{
+				Scope: PermissionScopeReadWrite,
+			},
+			want: []string{
+				http.MethodHead, http.MethodGet, http.MethodPost,
+				http.MethodPatch, http.MethodDelete, http.MethodPut,
+				http.MethodOptions, http.MethodConnect, http.MethodTrace,
+			},
+		},
+		{
+			name: "readonly without override",
+			fields: fields{
+				Scope: PermissionScopeReadonly,
+			},
+			want: []string{http.MethodHead, http.MethodGet, http.MethodOptions},
+		},
+		{
+			name: "readonly with override",
+			fields: fields{
+				Scope:                      PermissionScopeReadonly,
+				AllowedHTTPMethodsOverride: []string{http.MethodGet, http.MethodPost},
+			},
+			want: []string{http.MethodGet, http.MethodPost},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := Authorizer{
-				SecretProvider:              tt.fields.SecretProvider,
-				DeprecationExpirationPolicy: tt.fields.DeprecationExpirationPolicy,
-				ReadOnly:                    tt.fields.ReadOnly,
-				AllowedHTTPMethodsOverride:  tt.fields.AllowedHTTPMethodsOverride,
-			}
-			assert.Equalf(t, tt.want, a.AvailableHTTPMethods(), "AvailableHTTPMethods()")
+			a := NewAuthorizer(
+				tt.fields.SecretProvider,
+				tt.fields.DeprecationExpirationPolicy,
+				tt.fields.Scope,
+				tt.fields.AllowedHTTPMethodsOverride,
+			)
+			assert.ElementsMatch(t, tt.want, a.allowedHTTPMethods())
 		})
 	}
 }
@@ -124,6 +149,12 @@ func (p testSecretProvider) GetCurrentReadonlySecret() string    { return p.curr
 func (p testSecretProvider) GetDeprecatedReadonlySecret() string { return p.deprecatedReadonlySecret }
 
 func TestAuthorizer_IsValidRequest(t *testing.T) {
+	nonExpiredPolicy, err := NewDeprecationExpirationPolicyFromString(time.Now().Add(time.Hour).Format(time.RFC3339))
+	require.NoError(t, err)
+
+	expiredPolicy, err := NewDeprecationExpirationPolicyFromString(time.Now().Add(-time.Minute).Format(time.RFC3339))
+	require.NoError(t, err)
+
 	type fields struct {
 		SecretProvider              SecretProvider
 		DeprecationExpirationPolicy DeprecationExpirationPolicy
@@ -141,7 +172,7 @@ func TestAuthorizer_IsValidRequest(t *testing.T) {
 		want   bool
 	}{
 		{
-			name: "using read-only secret with HTTP method override",
+			name: "read-only secret with HTTP method override",
 			fields: fields{
 				SecretProvider:             &testSecretProvider{currentReadonlySecret: "secret-api-key"},
 				ReadOnly:                   true,
@@ -169,15 +200,53 @@ func TestAuthorizer_IsValidRequest(t *testing.T) {
 			},
 			want: true,
 		},
+		{
+			name: "deprecation policy fallback - non-expired",
+			fields: fields{
+				SecretProvider: &testSecretProvider{
+					currentSecret:    "secret-api-key",
+					deprecatedSecret: "deprecated-secret",
+				},
+				DeprecationExpirationPolicy: nonExpiredPolicy,
+			},
+			args: args{
+				r: &http.Request{
+					Method: http.MethodPost,
+				},
+				requestKey: "deprecated-secret",
+			},
+			want: true,
+		},
+		{
+			name: "deprecation policy fallback - expired",
+			fields: fields{
+				SecretProvider: &testSecretProvider{
+					currentSecret:    "secret-api-key",
+					deprecatedSecret: "deprecated-secret",
+				},
+				DeprecationExpirationPolicy: expiredPolicy,
+			},
+			args: args{
+				r: &http.Request{
+					Method: http.MethodPost,
+				},
+				requestKey: "deprecated-secret",
+			},
+			want: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := Authorizer{
-				SecretProvider:              tt.fields.SecretProvider,
-				DeprecationExpirationPolicy: tt.fields.DeprecationExpirationPolicy,
-				ReadOnly:                    tt.fields.ReadOnly,
-				AllowedHTTPMethodsOverride:  tt.fields.AllowedHTTPMethodsOverride,
+			scope := PermissionScopeReadWrite
+			if tt.fields.ReadOnly {
+				scope = PermissionScopeReadonly
 			}
+			a := NewAuthorizer(
+				tt.fields.SecretProvider,
+				tt.fields.DeprecationExpirationPolicy,
+				scope,
+				tt.fields.AllowedHTTPMethodsOverride,
+			)
 			assert.Equalf(t, tt.want, a.IsValidRequest(tt.args.r, tt.args.requestKey), "IsValidRequest(%v, %v)", tt.args.r, tt.args.requestKey)
 		})
 	}

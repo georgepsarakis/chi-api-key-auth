@@ -39,10 +39,9 @@ func main() {
 	// - CHI_API_KEY
 	// - CHI_API_KEY_READONLY
 	// The Authorization/Bearer header scheme as a request secret provider.
-	chiReadonly := apikey.NewOptions()
-	chiReadonly.ReadOnly = true
+	chiReadonlyOpts := apikey.NewReadonlyOptions()
 	r.Group(func(r chi.Router) {
-		r.Use(apikey.Authorize(chiReadonly))
+		r.Use(apikey.Authorize(chiReadonlyOpts))
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("welcome"))
 		})

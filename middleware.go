@@ -15,14 +15,26 @@ type Options struct {
 	AllowedHTTPMethodsOverride []string
 }
 
+var defaultSecretProvider = func() *EnvironmentSecretProvider {
+	return &EnvironmentSecretProvider{
+		CurrentSecretHeaderName:            "CHI_API_KEY",
+		DeprecatedSecretHeaderName:         "CHI_API_KEY_DEPRECATED",
+		ReadonlySecretHeaderName:           "CHI_API_KEY_READONLY",
+		DeprecatedReadonlySecretHeaderName: "CHI_API_KEY_READONLY_DEPRECATED",
+	}
+}
+
 func NewOptions() Options {
 	return Options{
-		SecretProvider: &EnvironmentSecretProvider{
-			CurrentSecretHeaderName:            "CHI_API_KEY",
-			DeprecatedSecretHeaderName:         "CHI_API_KEY_DEPRECATED",
-			ReadonlySecretHeaderName:           "CHI_API_KEY_READONLY",
-			DeprecatedReadonlySecretHeaderName: "CHI_API_KEY_READONLY_DEPRECATED",
-		},
+		SecretProvider:     defaultSecretProvider(),
+		HeaderAuthProvider: AuthorizationHeader{},
+	}
+}
+
+func NewReadonlyOptions() Options {
+	return Options{
+		SecretProvider:     defaultSecretProvider(),
+		ReadOnly:           true,
 		HeaderAuthProvider: AuthorizationHeader{},
 	}
 }
@@ -32,11 +44,16 @@ func Authorize(options Options) func(next http.Handler) http.Handler {
 	if options.FailureHandler == nil {
 		options.FailureHandler = DefaultUnauthorizedHandler()
 	}
-	auth := Authorizer{
-		SecretProvider:              options.SecretProvider,
-		DeprecationExpirationPolicy: options.DeprecationExpirationPolicy,
-		AllowedHTTPMethodsOverride:  options.AllowedHTTPMethodsOverride,
+	scope := PermissionScopeReadWrite
+	if options.ReadOnly {
+		scope = PermissionScopeReadonly
 	}
+	auth := NewAuthorizer(
+		options.SecretProvider,
+		options.DeprecationExpirationPolicy,
+		scope,
+		options.AllowedHTTPMethodsOverride,
+	)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			requestKey, ok := options.HeaderAuthProvider.Secret(r)

@@ -10,7 +10,7 @@ type DeprecationExpirationPolicy struct {
 }
 
 func (p DeprecationExpirationPolicy) Allow() bool {
-	return time.Now().Before(p.expireAt)
+	return !p.expireAt.IsZero() && time.Now().Before(p.expireAt)
 }
 
 func NewDeprecationExpirationPolicyFromEnvironment(variableName string) (DeprecationExpirationPolicy, error) {
