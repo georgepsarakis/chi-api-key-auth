@@ -23,22 +23,35 @@ type EnvironmentSecretProvider struct {
 	cache                              *sync.Map
 }
 
-func NewEnvironmentSecretProvider(current, deprecated, readonly, deprecatedReadonly string) *EnvironmentSecretProvider {
+type EnvironmentSecretProviderSettingNames struct {
+	CurrentSecretHeaderName            string
+	DeprecatedSecretHeaderName         string
+	ReadonlySecretHeaderName           string
+	DeprecatedReadonlySecretHeaderName string
+}
+
+func NewEnvironmentSecretProvider(s EnvironmentSecretProviderSettingNames) *EnvironmentSecretProvider {
 	return &EnvironmentSecretProvider{
-		CurrentSecretHeaderName:            current,
-		DeprecatedSecretHeaderName:         deprecated,
-		ReadonlySecretHeaderName:           readonly,
-		DeprecatedReadonlySecretHeaderName: deprecatedReadonly,
+		CurrentSecretHeaderName:            s.CurrentSecretHeaderName,
+		DeprecatedSecretHeaderName:         s.DeprecatedSecretHeaderName,
+		ReadonlySecretHeaderName:           s.ReadonlySecretHeaderName,
+		DeprecatedReadonlySecretHeaderName: s.DeprecatedReadonlySecretHeaderName,
 		cache:                              &sync.Map{},
 	}
 }
 
 func NewEnvironmentSecretProviderReadWrite(current, deprecated string) *EnvironmentSecretProvider {
-	return NewEnvironmentSecretProvider(current, deprecated, "", "")
+	return NewEnvironmentSecretProvider(EnvironmentSecretProviderSettingNames{
+		CurrentSecretHeaderName:    current,
+		DeprecatedSecretHeaderName: deprecated,
+	})
 }
 
 func NewEnvironmentSecretProviderReadonly(readonly, deprecatedReadonly string) *EnvironmentSecretProvider {
-	return NewEnvironmentSecretProvider("", "", readonly, deprecatedReadonly)
+	return NewEnvironmentSecretProvider(EnvironmentSecretProviderSettingNames{
+		ReadonlySecretHeaderName:           readonly,
+		DeprecatedReadonlySecretHeaderName: deprecatedReadonly,
+	})
 }
 
 func (p EnvironmentSecretProvider) GetCurrentSecret() string {

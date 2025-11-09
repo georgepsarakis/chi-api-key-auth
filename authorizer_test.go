@@ -329,7 +329,11 @@ func TestAuthorizer_AvailableAPIKeys_ReadonlySecret(t *testing.T) {
 	nonExpiredPolicy, err := NewDeprecationExpirationPolicyFromString(time.Now().Add(time.Hour).Format(time.RFC3339))
 	require.NoError(t, err)
 
-	provider := NewEnvironmentSecretProvider("CURRENT_SECRET", "", "READONLY_SECRET", "DEPRECATED_READONLY_SECRET")
+	provider := NewEnvironmentSecretProvider(EnvironmentSecretProviderSettingNames{
+		CurrentSecretHeaderName:            "CURRENT_SECRET",
+		ReadonlySecretHeaderName:           "READONLY_SECRET",
+		DeprecatedReadonlySecretHeaderName: "DEPRECATED_READONLY_SECRET",
+	})
 
 	auth := Authorizer{
 		SecretProvider:              provider,
@@ -346,7 +350,10 @@ func TestAuthorizer_AvailableAPIKeys_ReadonlySecret(t *testing.T) {
 func TestAuthorizer_AvailableAPIKeys_ReadonlySecret_MethodNotAllowed(t *testing.T) {
 	t.Setenv("READONLY_SECRET", "readonly-key")
 
-	provider := NewEnvironmentSecretProvider("CURRENT_SECRET", "", "READONLY_SECRET", "")
+	provider := NewEnvironmentSecretProvider(EnvironmentSecretProviderSettingNames{
+		CurrentSecretHeaderName:  "CURRENT_SECRET",
+		ReadonlySecretHeaderName: "READONLY_SECRET",
+	})
 
 	auth := Authorizer{
 		SecretProvider:       provider,

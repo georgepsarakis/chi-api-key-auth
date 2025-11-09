@@ -24,10 +24,12 @@ func NewOptions() Options {
 
 func defaultSecretProvider() *EnvironmentSecretProvider {
 	return NewEnvironmentSecretProvider(
-		"CHI_API_KEY",
-		"CHI_API_KEY_DEPRECATED",
-		"CHI_API_KEY_READONLY",
-		"CHI_API_KEY_READONLY_DEPRECATED",
+		EnvironmentSecretProviderSettingNames{
+			CurrentSecretHeaderName:            "CHI_API_KEY",
+			DeprecatedSecretHeaderName:         "CHI_API_KEY_DEPRECATED",
+			ReadonlySecretHeaderName:           "CHI_API_KEY_READONLY",
+			DeprecatedReadonlySecretHeaderName: "CHI_API_KEY_READONLY_DEPRECATED",
+		},
 	)
 }
 
@@ -62,8 +64,7 @@ func Authorize(options Options) func(next http.Handler) http.Handler {
 				return
 			}
 			if !auth.IsValidRequest(r, requestKey) {
-				r = r.WithContext(NewUnauthorizedContext(r.Context()))
-				options.FailureHandler(w, r)
+				options.FailureHandler(w, r.WithContext(NewUnauthorizedContext(r.Context())))
 				return
 			}
 

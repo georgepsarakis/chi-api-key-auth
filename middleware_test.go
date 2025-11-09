@@ -19,8 +19,6 @@ const envVariableName = "CONFIG_API_KEY_CURRENT"
 func TestAPITokenAuth_Allow(t *testing.T) {
 	router := chi.NewRouter()
 
-	assert.NotEmpty(t, apiKeySecret(t))
-
 	t.Setenv(envVariableName, "test-x-api-key-123")
 	router.Use(
 		Authorize(Options{
@@ -56,6 +54,9 @@ func TestAPITokenAuth_Allow(t *testing.T) {
 
 func TestAPITokenAuth_Deny(t *testing.T) {
 	router := chi.NewRouter()
+
+	assert.NotEmpty(t, apiKeySecret(t))
+
 	t.Setenv(envVariableName, apiKeySecret(t))
 
 	router.Use(
