@@ -67,4 +67,17 @@ func TestDeprecationExpirationPolicyFromEnvironment(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, p.Allow())
 	}
+
+	// Empty environment variable should return error
+	t.Setenv("EMPTY_VAR", "")
+	{
+		_, err := NewDeprecationExpirationPolicyFromEnvironment("EMPTY_VAR")
+		require.Error(t, err, "Should return error for empty environment variable")
+	}
+
+	// Unset environment variable should return error
+	{
+		_, err := NewDeprecationExpirationPolicyFromEnvironment("NONEXISTENT_VAR")
+		require.Error(t, err, "Should return error for nonexistent environment variable")
+	}
 }

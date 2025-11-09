@@ -5,16 +5,16 @@ import (
 	"net/http"
 )
 
-type ctxKey string
+type ctxKey struct{}
 
-const UnauthorizedContextKey ctxKey = "unauthorized"
+var unauthorizedContextKey = ctxKey{} //nolint:gochecknoglobals
 
 func NewUnauthorizedContext(ctx context.Context) context.Context {
-	return context.WithValue(ctx, UnauthorizedContextKey, true)
+	return context.WithValue(ctx, unauthorizedContextKey, true)
 }
 
 func IsUnauthorized(ctx context.Context) bool {
-	unauthorized, ok := ctx.Value(UnauthorizedContextKey).(bool)
+	unauthorized, ok := ctx.Value(unauthorizedContextKey).(bool)
 	return ok && unauthorized
 }
 

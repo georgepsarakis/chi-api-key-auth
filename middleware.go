@@ -23,12 +23,12 @@ func NewOptions() Options {
 }
 
 func defaultSecretProvider() *EnvironmentSecretProvider {
-	return &EnvironmentSecretProvider{
-		CurrentSecretHeaderName:            "CHI_API_KEY",
-		DeprecatedSecretHeaderName:         "CHI_API_KEY_DEPRECATED",
-		ReadonlySecretHeaderName:           "CHI_API_KEY_READONLY",
-		DeprecatedReadonlySecretHeaderName: "CHI_API_KEY_READONLY_DEPRECATED",
-	}
+	return NewEnvironmentSecretProvider(
+		"CHI_API_KEY",
+		"CHI_API_KEY_DEPRECATED",
+		"CHI_API_KEY_READONLY",
+		"CHI_API_KEY_READONLY_DEPRECATED",
+	)
 }
 
 func NewReadonlyOptions() Options {

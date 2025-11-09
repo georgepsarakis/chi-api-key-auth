@@ -28,7 +28,7 @@ func TestAuthorizer_AvailableAPIKeys(t *testing.T) {
 		{
 			name: "deprecation policy is valid but deprecated key is not defined",
 			fields: fields{
-				SecretProvider: &EnvironmentSecretProvider{CurrentSecretHeaderName: "API_TOKEN_SECRET"},
+				SecretProvider: NewEnvironmentSecretProviderReadWrite("API_TOKEN_SECRET", ""),
 				DeprecationExpirationPolicy: func() DeprecationExpirationPolicy {
 					p, err := NewDeprecationExpirationPolicyFromString(time.Now().Add(time.Minute).Format(time.RFC3339))
 					require.NoError(t, err)
@@ -41,10 +41,7 @@ func TestAuthorizer_AvailableAPIKeys(t *testing.T) {
 		{
 			name: "deprecation policy is valid and deprecated key is defined",
 			fields: fields{
-				SecretProvider: &EnvironmentSecretProvider{
-					CurrentSecretHeaderName:    "API_TOKEN_SECRET",
-					DeprecatedSecretHeaderName: "DEPRECATED_API_TOKEN_SECRET",
-				},
+				SecretProvider: NewEnvironmentSecretProviderReadWrite("API_TOKEN_SECRET", "DEPRECATED_API_TOKEN_SECRET"),
 				DeprecationExpirationPolicy: func() DeprecationExpirationPolicy {
 					p, err := NewDeprecationExpirationPolicyFromString(time.Now().Add(time.Minute).Format(time.RFC3339))
 					require.NoError(t, err)
@@ -57,10 +54,7 @@ func TestAuthorizer_AvailableAPIKeys(t *testing.T) {
 		{
 			name: "deprecation policy is invalid and deprecated key is defined",
 			fields: fields{
-				SecretProvider: &EnvironmentSecretProvider{
-					CurrentSecretHeaderName:    "API_TOKEN_SECRET",
-					DeprecatedSecretHeaderName: "DEPRECATED_API_TOKEN_SECRET",
-				},
+				SecretProvider: NewEnvironmentSecretProviderReadWrite("API_TOKEN_SECRET", "DEPRECATED_API_TOKEN_SECRET"),
 				DeprecationExpirationPolicy: func() DeprecationExpirationPolicy {
 					p, err := NewDeprecationExpirationPolicyFromString(time.Now().Add(-time.Second).Format(time.RFC3339))
 					require.NoError(t, err)
@@ -250,4 +244,116 @@ func TestAuthorizer_IsValidRequest(t *testing.T) {
 			assert.Equalf(t, tt.want, a.IsValidRequest(tt.args.r, tt.args.requestKey), "IsValidRequest(%v, %v)", tt.args.r, tt.args.requestKey)
 		})
 	}
+}
+
+func TestNewReadonlyAuthorizer(t *testing.T) {
+	provider := &testSecretProvider{currentSecret: "test-secret"}
+	httpMethods := []string{http.MethodGet, http.MethodPost}
+
+	auth := NewReadonlyAuthorizer(provider, httpMethods)
+
+	assert.Equal(t, provider, auth.SecretProvider)
+	assert.True(t, auth.readOnly)
+	assert.Equal(t, httpMethods, auth.allowedHTTPMethods())
+}
+
+func TestAuthorizer_IsValidRequest_EmptyRequestKey(t *testing.T) {
+	provider := &testSecretProvider{
+		currentSecret: "valid-key",
+	}
+	auth := NewAuthorizer(provider, DeprecationExpirationPolicy{}, PermissionScopeReadWrite, nil)
+
+	req := &http.Request{Method: http.MethodGet}
+	result := auth.IsValidRequest(req, "")
+
+	assert.False(t, result, "Should return false when requestKey is empty")
+}
+
+func TestAuthorizer_IsValidRequest_EmptyKeyInLoop(t *testing.T) {
+	provider := &testSecretProvider{
+		currentSecret: "", // Empty secret
+	}
+	auth := NewAuthorizer(provider, DeprecationExpirationPolicy{}, PermissionScopeReadWrite, nil)
+
+	req := &http.Request{Method: http.MethodGet}
+	result := auth.IsValidRequest(req, "some-key")
+
+	assert.False(t, result, "Should return false when all keys are empty")
+}
+
+func TestAuthorizer_IsValidRequest_NoMatch(t *testing.T) {
+	provider := &testSecretProvider{
+		currentSecret: "valid-key",
+	}
+	auth := NewAuthorizer(provider, DeprecationExpirationPolicy{}, PermissionScopeReadWrite, nil)
+
+	req := &http.Request{Method: http.MethodGet}
+	result := auth.IsValidRequest(req, "wrong-key")
+
+	assert.False(t, result, "Should return false when key doesn't match")
+}
+
+func TestAuthorizer_IsValidRequest_MultipleKeys_SecondMatches(t *testing.T) {
+	nonExpiredPolicy, err := NewDeprecationExpirationPolicyFromString(time.Now().Add(time.Hour).Format(time.RFC3339))
+	require.NoError(t, err)
+
+	provider := &testSecretProvider{
+		currentSecret:    "first-key",
+		deprecatedSecret: "second-key",
+	}
+	auth := NewAuthorizer(provider, nonExpiredPolicy, PermissionScopeReadWrite, nil)
+
+	req := &http.Request{Method: http.MethodGet}
+	result := auth.IsValidRequest(req, "second-key")
+
+	assert.True(t, result, "Should return true when second key in list matches")
+}
+
+func TestAuthorizer_IsValidRequest_EmptyAvailableKeys(t *testing.T) {
+	provider := &testSecretProvider{
+		currentSecret:    "",
+		deprecatedSecret: "",
+	}
+	auth := NewAuthorizer(provider, DeprecationExpirationPolicy{}, PermissionScopeReadWrite, nil)
+
+	req := &http.Request{Method: http.MethodGet}
+	result := auth.IsValidRequest(req, "some-key")
+
+	assert.False(t, result, "Should return false when availableAPIKeys returns empty slice")
+}
+
+func TestAuthorizer_AvailableAPIKeys_ReadonlySecret(t *testing.T) {
+	t.Setenv("READONLY_SECRET", "readonly-key")
+	t.Setenv("DEPRECATED_READONLY_SECRET", "deprecated-readonly-key")
+
+	nonExpiredPolicy, err := NewDeprecationExpirationPolicyFromString(time.Now().Add(time.Hour).Format(time.RFC3339))
+	require.NoError(t, err)
+
+	provider := NewEnvironmentSecretProvider("CURRENT_SECRET", "", "READONLY_SECRET", "DEPRECATED_READONLY_SECRET")
+
+	auth := Authorizer{
+		SecretProvider:              provider,
+		DeprecationExpirationPolicy: nonExpiredPolicy,
+		readOnly:                    true,
+		availableHTTPMethods:        []string{http.MethodGet},
+	}
+
+	keys := auth.availableAPIKeys(http.MethodGet)
+	assert.Contains(t, keys, "readonly-key", "Should include readonly secret for allowed method")
+	assert.Contains(t, keys, "deprecated-readonly-key", "Should include deprecated readonly secret when policy allows")
+}
+
+func TestAuthorizer_AvailableAPIKeys_ReadonlySecret_MethodNotAllowed(t *testing.T) {
+	t.Setenv("READONLY_SECRET", "readonly-key")
+
+	provider := NewEnvironmentSecretProvider("CURRENT_SECRET", "", "READONLY_SECRET", "")
+
+	auth := Authorizer{
+		SecretProvider:       provider,
+		readOnly:             true,
+		availableHTTPMethods: []string{http.MethodGet}, // POST not in allowed methods
+	}
+
+	keys := auth.availableAPIKeys(http.MethodPost)
+	assert.NotContains(t, keys, "readonly-key", "Should not include readonly secret for disallowed method")
 }

@@ -20,14 +20,32 @@ type EnvironmentSecretProvider struct {
 	DeprecatedSecretHeaderName         string
 	ReadonlySecretHeaderName           string
 	DeprecatedReadonlySecretHeaderName string
-	cache                              sync.Map
+	cache                              *sync.Map
 }
 
-func (p *EnvironmentSecretProvider) GetCurrentSecret() string {
+func NewEnvironmentSecretProvider(current, deprecated, readonly, deprecatedReadonly string) *EnvironmentSecretProvider {
+	return &EnvironmentSecretProvider{
+		CurrentSecretHeaderName:            current,
+		DeprecatedSecretHeaderName:         deprecated,
+		ReadonlySecretHeaderName:           readonly,
+		DeprecatedReadonlySecretHeaderName: deprecatedReadonly,
+		cache:                              &sync.Map{},
+	}
+}
+
+func NewEnvironmentSecretProviderReadWrite(current, deprecated string) *EnvironmentSecretProvider {
+	return NewEnvironmentSecretProvider(current, deprecated, "", "")
+}
+
+func NewEnvironmentSecretProviderReadonly(readonly, deprecatedReadonly string) *EnvironmentSecretProvider {
+	return NewEnvironmentSecretProvider("", "", readonly, deprecatedReadonly)
+}
+
+func (p EnvironmentSecretProvider) GetCurrentSecret() string {
 	return p.load(p.CurrentSecretHeaderName)
 }
 
-func (p *EnvironmentSecretProvider) load(key string) string {
+func (p EnvironmentSecretProvider) load(key string) string {
 	if v, ok := p.cache.Load(key); ok {
 		return v.(string)
 	}
@@ -36,12 +54,16 @@ func (p *EnvironmentSecretProvider) load(key string) string {
 	return v
 }
 
-func (p *EnvironmentSecretProvider) GetDeprecatedSecret() string {
+func (p EnvironmentSecretProvider) GetDeprecatedSecret() string {
 	return p.load(p.DeprecatedSecretHeaderName)
 }
 
-func (p *EnvironmentSecretProvider) GetCurrentReadonlySecret() string {
+func (p EnvironmentSecretProvider) GetCurrentReadonlySecret() string {
 	return p.load(p.ReadonlySecretHeaderName)
+}
+
+func (p EnvironmentSecretProvider) GetDeprecatedReadonlySecret() string {
+	return p.load(p.DeprecatedReadonlySecretHeaderName)
 }
 
 type HeaderAuthProvider interface {

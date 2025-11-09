@@ -4,9 +4,12 @@ A [Chi](https://github.com/go-chi/chi) middleware for API Key-based authorizatio
 
 ## Features
 
-### Deprecation Policy
+### Support for Key Deprecation
 
-Key rotation support using limited validity for API Key values under deprecation.
+What happens when a key needs to be rotated? Since deployments among services cannot be 100% synchronized, enforcing a new secret will cause requests using the old key version to be rejected.
+
+The middleware supports two different secrets for both read/write and read-only scopes.
+In addition, the deprecated key can be supported for a limited period of time.
 
 ### Support for read-only & read-write keys
 
